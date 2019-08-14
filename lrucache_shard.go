@@ -30,8 +30,7 @@ func NewLRUCacheShard(capacity uint64) *LRUCacheShard {
 /**
 create lruhandle and Insert to cache,
 */
-func (this *LRUCacheShard) Insert(key []byte, hash uint32, value []byte, charge uint64,
-	deleter func(key, value []byte)) error {
+func (this *LRUCacheShard) Insert(key []byte, hash uint32, value interface{}, charge uint64, deleter handle_deleter) error {
 
 	// If the cache is full, we'll have to release it
 	// It shouldn't happen very often though.
@@ -61,7 +60,7 @@ func (this *LRUCacheShard) Insert(key []byte, hash uint32, value []byte, charge 
 	return err
 }
 
-func (this *LRUCacheShard) Remove(key []byte, hash uint32) []byte {
+func (this *LRUCacheShard) Remove(key []byte, hash uint32) interface{} {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	return this.lru_remove(key, hash)
@@ -94,7 +93,7 @@ func (this *LRUCacheShard) TotalCharge() uint64 {
 /**
 find key's lruhandle, return nil if not find;
 */
-func (this *LRUCacheShard) Lookup(key []byte, hash uint32) []byte {
+func (this *LRUCacheShard) Lookup(key []byte, hash uint32) interface{} {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();;
 	e := this.table.Lookup(key, hash);
@@ -107,7 +106,7 @@ func (this *LRUCacheShard) Lookup(key []byte, hash uint32) []byte {
 
 /*********** lru method *************/
 
-func (this *LRUCacheShard) lru_remove(key []byte, hash uint32) []byte {
+func (this *LRUCacheShard) lru_remove(key []byte, hash uint32) interface{} {
 	e := this.table.Lookup(key, hash);
 	if e != nil {
 		this.lru_remove_handle(e, true)

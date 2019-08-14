@@ -6,8 +6,8 @@ import (
 
 
 type LRUHandle struct {
-	value     []byte
-	deleter   func(key, value []byte)
+	value     interface{}
+	deleter   handle_deleter
 	next_hash *LRUHandle
 	next      *LRUHandle;
 	prev      *LRUHandle;

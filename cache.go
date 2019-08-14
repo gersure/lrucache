@@ -1,15 +1,16 @@
 package lrucache
 
+type handle_deleter func(key []byte, value interface{})
+
 type Cache interface {
 	Put(key string, value string)
 	Get(key string) (string, bool)
-	Delete(key string) string
+	Delete(key string)
 	NewId() uint64
 	Prune()
 	TotalCharge() uint64
 
-	Insert(key, value []byte, charge uint64,
-		deleter func(key, value []byte))
-	Lookup(key []byte) []byte
-	Remove(key []byte) []byte
+	Insert(key[]byte, entry interface{}, charge uint64, deleter handle_deleter)
+	Lookup(key []byte) interface{}
+	Remove(key []byte) interface{}
 }

@@ -38,20 +38,20 @@ func NewLRUCache(capacity uint64, num_shard_bits uint) *LRUCache {
 }
 
 func (this *LRUCache) Put(key, value string) {
-	this.Insert([]byte(key), []byte(value), uint64(len(key)+len(value)), nil)
+	this.Insert([]byte(key), (value), uint64(len(key)+len(value)), nil)
 }
 
 func (this *LRUCache) Get(key string) (string, bool) {
 	value := this.Lookup([]byte(key))
-	if value == nil {
+	res,ok := value.(string)
+	if !ok {
 		return "", false
 	}
-	return string(value[:]), true
+	return res, true
 }
 
-func (this *LRUCache) Delete(key string) string {
-	value := this.Remove([]byte(key))
-	return string(value[:])
+func (this *LRUCache) Delete(key string){
+	this.Remove([]byte(key))
 }
 
 func (this *LRUCache) NewId() uint64 {
@@ -80,18 +80,17 @@ func (this *LRUCache) shard(hash uint32) uint32 {
 	return 0
 }
 
-func (this *LRUCache) Insert(key, value []byte, charge uint64,
-	deleter func(key, value []byte)) {
+func (this *LRUCache) Insert(key []byte, value interface{}, charge uint64,	deleter handle_deleter) {
 	hash := HashSlice(key);
 	this.shards[this.shard(hash)].Insert(key, hash, value, charge, deleter);
 }
 
-func (this *LRUCache) Lookup(key []byte) []byte {
+func (this *LRUCache) Lookup(key []byte) interface{} {
 	hash := HashSlice(key);
 	return this.shards[this.shard(hash)].Lookup(key, hash);
 }
 
-func (this *LRUCache) Remove(key []byte) []byte {
+func (this *LRUCache) Remove(key []byte) interface{} {
 	hash := HashSlice(key);
 	return this.shards[this.shard(hash)].Remove(key, hash);
 }
