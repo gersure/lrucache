@@ -52,20 +52,24 @@ func (this *LRUCacheShard) Lookup(key []byte, hash uint32) interface{} {
 	return nil;
 }
 
-func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, charge uint64, merge MergeOperator, charge_opt ChargeOperator) {
+func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, charge uint64, merge MergeOperator, charge_opt ChargeOperator) (interface{}) {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	e := this.handle_lookup_update(key, hash)
 	var new_value interface{}
 	var new_charge uint64
+	var res interface{}
 	if e != nil {
+		res = e.entry
 		new_value = merge(e.entry, entry)
-		new_charge = charge_opt(entry, 0, charge)
-	}else{
-		new_value = merge(nil, entry)
 		new_charge = charge_opt(entry, e.charge, charge)
+	}else{
+		res = nil
+		new_value = merge(nil, entry)
+		new_charge = charge_opt(entry, 0, charge)
 	}
 	this.insert(key, hash, new_value, new_charge, e.deleter)
+	return res
 }
 
 func (this *LRUCacheShard) Remove(key []byte, hash uint32) interface{} {

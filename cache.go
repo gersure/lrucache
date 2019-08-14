@@ -15,5 +15,5 @@ type Cache interface {
 	Insert(key[]byte, entry interface{}, charge uint64, deleter DeleteCallback)
 	Lookup(key []byte) interface{}
 	Remove(key []byte) interface{}
-	Merge(key []byte, entry interface{}, charge uint64,  merge_opt MergeOperator, charge_opt ChargeOperator)
+	Merge(key []byte, entry interface{}, charge uint64,  merge_opt MergeOperator, charge_opt ChargeOperator) (old_entry interface{})
 }

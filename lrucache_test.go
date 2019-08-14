@@ -282,22 +282,36 @@ func TestLRUCache_MergeAppend(t *testing.T) {
 	}
 
 	var charge_opt ChargeOperator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
-		return old_charge
+		return old_charge+new_charge
 	}
 
 	key := []byte("key")
 	var value string
 	merge_value := "1"
 	var res_total string
+	var capacity_totoal uint64 = 0
+	var res_string string
+
 	lru := NewLRUCache(capacity, 1)
-	lru.Insert(key, value, 4, nil)
+	lru.Insert(key, value, 0, nil)
 	for i:=0 ; i<100; i++ {
-		lru.Merge(key, merge_value, 0, merge_opt, charge_opt)
+		old_origin := lru.Merge(key, merge_value, uint64(len(merge_value)), merge_opt, charge_opt)
+		res_string += merge_value
+		capacity_totoal += uint64(len(merge_value))
 		res_total += merge_value
 		res := lru.Lookup(key)
 		add_res,_ := res.(string)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%s, got:%s", res_total, add_res)
+		}
+
+		if lru.TotalCharge() != capacity_totoal {
+			t.Errorf("merge charge operator maybe error;expected:%v, got:%v", capacity_totoal, lru.TotalCharge())
+		}
+
+		old_origin,_ = old_origin.(string)
+		if len(res_string) >=2 && old_origin != res_string[:len(res_string)-1] {
+			t.Errorf("merge return old entry error; expected:%s, got:%s", res_string[:(len(res_string)-1)], old_origin)
 		}
 	}
 
