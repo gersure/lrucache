@@ -66,7 +66,7 @@ func TestNewLRUCache(t *testing.T) {
 		}
 
 
-		if lru.Get([]byte("test")) != nil {
+		if _, ok := lru.Get(("test"));ok {
 			t.Errorf("empty cache lookup isn't nil")
 		}
 
@@ -80,7 +80,7 @@ func TestNewLRUCache(t *testing.T) {
 
 		lru.Insert([]byte("test"), []byte("value"), 10, nil)
 
-		lru.Put([]byte("test"), []byte("value"))
+		lru.Put(("test"), ("value"))
 	}
 
 }
@@ -91,11 +91,11 @@ func TestLRUCache_PutGetDelete(t *testing.T) {
 		lru := NewLRUCache(test.capacity, 0)
 		var total_charge uint64= 0
 		for _, test_bar := range case_cache {
-			lru.Put(test_bar.key, test_bar.value)
+			lru.Put(string(test_bar.key[:]), string(test_bar.value[:]))
 			total_charge += uint64(len(test_bar.key)+len(test_bar.value))
 
-			origin := lru.Get(test_bar.key)
-			if bytes.Compare(origin, test_bar.value) != 0 {
+			origin, _ := lru.Get(string(test_bar.key))
+			if origin != string(test_bar.value) {
 				t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
 			}
 			if lru.TotalCharge() != total_charge {
@@ -108,19 +108,19 @@ func TestLRUCache_PutGetDelete(t *testing.T) {
 	var total_charge uint64= 0
 	lru := NewLRUCache(1024*1024, 1)
 	for _, test_bar := range case_cache {
-		lru.Put(test_bar.key, test_bar.value)
+		lru.Put(string(test_bar.key), string(test_bar.value))
 		total_charge += uint64(len(test_bar.key)+len(test_bar.value))
-		origin := lru.Get(test_bar.key)
-		if bytes.Compare(origin, test_bar.value) != 0 {
+		origin,_ := lru.Get(string(test_bar.key))
+		if origin != string(test_bar.value) {
 			t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
 		}
 		if lru.TotalCharge() != total_charge {
 			t.Errorf("total charge expected: %v, got: %v", total_charge, lru.TotalCharge())
 		}
 
-		origin = lru.Delete(test_bar.key)
+		origin = lru.Delete(string(test_bar.key))
 		total_charge -= uint64(len(test_bar.key)+len(test_bar.value))
-		if bytes.Compare(origin, test_bar.value) != 0 {
+		if origin != string(test_bar.value) {
 			t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
 		}
 		if lru.TotalCharge() != total_charge {
@@ -222,7 +222,7 @@ func TestLRUCache_LRUCharge(t *testing.T) {
 		if total_charge > (per_shard*uint64(num_shards)) {
 			if (now_deleted > 0) {
 				now_deleted_key := []byte(strconv.FormatInt(int64(now_deleted), 10))
-				if lru.Get(now_deleted_key) != nil {
+				if _, ok := lru.Get(string(now_deleted_key)); ok {
 					t.Errorf("now total charge: %v, but got before key:%s", lru.TotalCharge(), now_deleted_key)
 				}
 			}

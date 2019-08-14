@@ -4,7 +4,6 @@ import (
 	"sync/atomic"
 )
 
-
 // impl of interface Cache
 type LRUCache struct {
 	shards         []*LRUCacheShard
@@ -38,19 +37,22 @@ func NewLRUCache(capacity uint64, num_shard_bits uint) *LRUCache {
 	return cache
 }
 
-func (this *LRUCache) Put(key []byte, value []byte) {
-	this.Insert(key, value, uint64(len(key)+len(value)), nil)
+func (this *LRUCache) Put(key, value string) {
+	this.Insert([]byte(key), []byte(value), uint64(len(key)+len(value)), nil)
 }
 
-func (this *LRUCache) Get(key []byte) []byte {
-	return this.Lookup(key)
+func (this *LRUCache) Get(key string) (string, bool) {
+	value := this.Lookup([]byte(key))
+	if value == nil {
+		return "", false
+	}
+	return string(value[:]), true
 }
 
-
-func (this *LRUCache) Delete(key []byte) []byte {
-	return this.Remove(key)
+func (this *LRUCache) Delete(key string) string {
+	value := this.Remove([]byte(key))
+	return string(value[:])
 }
-
 
 func (this *LRUCache) NewId() uint64 {
 	return atomic.AddUint64(&this.atomic_last_id, 1)
@@ -71,15 +73,12 @@ func (this *LRUCache) TotalCharge() uint64 {
 	return total;
 }
 
-
-
 func (this *LRUCache) shard(hash uint32) uint32 {
 	if (this.num_shard_bits > 0) {
 		return hash >> (32 - this.num_shard_bits)
 	}
 	return 0
 }
-
 
 func (this *LRUCache) Insert(key, value []byte, charge uint64,
 	deleter func(key, value []byte)) {
@@ -96,7 +95,6 @@ func (this *LRUCache) Remove(key []byte) []byte {
 	hash := HashSlice(key);
 	return this.shards[this.shard(hash)].Remove(key, hash);
 }
-
 
 func getDefaultCacheShardBits(capacity uint64) uint {
 	num_shard_bits := uint(0);

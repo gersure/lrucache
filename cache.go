@@ -1,9 +1,9 @@
 package lrucache
 
 type Cache interface {
-	Put(key []byte, value []byte)
-	Get(key []byte) []byte
-	Delete(key []byte) []byte
+	Put(key string, value string)
+	Get(key string) string
+	Delete(key string) []string
 	NewId() uint64
 	Prune()
 	TotalCharge() uint64
