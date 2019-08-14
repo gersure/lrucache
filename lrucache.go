@@ -80,9 +80,9 @@ func (this *LRUCache) shard(hash uint32) uint32 {
 	return 0
 }
 
-func (this *LRUCache) Insert(key []byte, value interface{}, charge uint64,	deleter handle_deleter) {
+func (this *LRUCache) Insert(key []byte, entry interface{}, charge uint64,	deleter deleter_callback) {
 	hash := HashSlice(key);
-	this.shards[this.shard(hash)].Insert(key, hash, value, charge, deleter);
+	this.shards[this.shard(hash)].Insert(key, hash, entry, charge, deleter);
 }
 
 func (this *LRUCache) Lookup(key []byte) interface{} {
@@ -93,6 +93,12 @@ func (this *LRUCache) Lookup(key []byte) interface{} {
 func (this *LRUCache) Remove(key []byte) interface{} {
 	hash := HashSlice(key);
 	return this.shards[this.shard(hash)].Remove(key, hash);
+}
+
+
+func (this *LRUCache) Merge(key []byte, entry interface{}, charge uint64, merge_opt merge_operator, charge_opt charge_operator) {
+	hash := HashSlice(key);
+	this.shards[this.shard(hash)].Merge(key, hash, entry, charge, merge_opt, charge_opt);
 }
 
 func getDefaultCacheShardBits(capacity uint64) uint {

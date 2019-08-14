@@ -31,7 +31,7 @@ var case_cache = []struct{
 	key []byte
 	value string
 	charge uint64
-	deleter handle_deleter
+	deleter deleter_callback
 } {
 	{[]byte("key0"),("value0"), 10, nil},
 	{[]byte("key1"),("value1"), 15, nil},
@@ -235,4 +235,70 @@ func TestLRUCache_LRUCharge(t *testing.T) {
 			now_deleted ++
 		}
 	}
+}
+
+
+func TestLRUCache_MergeAdd(t *testing.T) {
+
+	var capacity uint64 = 1024*1024
+	var merge_opt merge_operator = func(old_entry, new_entry interface{}) interface{} {
+		old, _ := old_entry.(int)
+		new, _ := new_entry.(int)
+		res := old + new
+		return res
+	}
+
+	var charge_opt charge_operator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
+		return old_charge
+	}
+
+	key := []byte("key")
+	var value int = 0
+	var merge_value int = 1
+	var res_total = 0
+	lru := NewLRUCache(capacity, 1)
+	lru.Insert(key, value, 4, nil)
+	for i:=0 ; i<1000; i++ {
+		lru.Merge(key, merge_value, 0, merge_opt, charge_opt)
+		res_total += merge_value
+		res := lru.Lookup(key)
+		add_res,_ := res.(int)
+		if add_res != res_total {
+			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
+		}
+	}
+
+}
+
+
+func TestLRUCache_MergeAppend(t *testing.T) {
+
+	var capacity uint64 = 1024*1024
+	var merge_opt merge_operator = func(old_entry, new_entry interface{}) interface{} {
+		old, _ := old_entry.(string)
+		new, _ := new_entry.(string)
+		res := old + new
+		return res
+	}
+
+	var charge_opt charge_operator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
+		return old_charge
+	}
+
+	key := []byte("key")
+	var value string
+	merge_value := "1"
+	var res_total string
+	lru := NewLRUCache(capacity, 1)
+	lru.Insert(key, value, 4, nil)
+	for i:=0 ; i<100; i++ {
+		lru.Merge(key, merge_value, 0, merge_opt, charge_opt)
+		res_total += merge_value
+		res := lru.Lookup(key)
+		add_res,_ := res.(string)
+		if add_res != res_total {
+			t.Errorf("merge operator error expected:%s, got:%s", res_total, add_res)
+		}
+	}
+
 }

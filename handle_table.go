@@ -6,8 +6,8 @@ import (
 
 
 type LRUHandle struct {
-	value     interface{}
-	deleter   handle_deleter
+	entry     interface{}
+	deleter   deleter_callback
 	next_hash *LRUHandle
 	next      *LRUHandle;
 	prev      *LRUHandle;
