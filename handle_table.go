@@ -4,6 +4,19 @@ import (
 "bytes"
 )
 
+
+type LRUHandle struct {
+	value     []byte
+	deleter   func(key, value []byte)
+	next_hash *LRUHandle
+	next      *LRUHandle;
+	prev      *LRUHandle;
+	charge    uint64; // TODO(opt): Only allow uint32_t?
+	hash      uint32; // Hash of key(); used for fast sharding and comparisons
+	key  []byte; // Beginning of key
+}
+
+
 type HandleTable struct {
 	list   []*LRUHandle
 	lenght uint32
@@ -24,6 +37,10 @@ func (this *HandleTable) Lookup(key []byte, hash uint32) *LRUHandle {
 	return *this.findPointer(key, hash)
 }
 
+/**
+	when not find return nil;
+	else replace handl and return old handle
+ */
 func (this *HandleTable) Insert(e *LRUHandle) *LRUHandle {
 	pptr := this.findPointer(e.key, e.hash)
 	old := *pptr
@@ -58,15 +75,6 @@ func (this *HandleTable) Remove(key []byte, hash uint32) *LRUHandle {
 
 
 
-func (this *HandleTable) findPointer(key []byte, hash uint32) **LRUHandle {
-	ptr := &this.list[hash&(this.lenght-1)]
-	for ; *ptr != nil &&
-		((*ptr).hash != hash || bytes.Compare(key, (*ptr).key) != 0); {
-		ptr = &(*ptr).next_hash
-	}
-	return ptr
-}
-
 func (this *HandleTable) Resize() {
 
 	var new_length uint32 = 16;
@@ -97,7 +105,7 @@ func (this *HandleTable) Resize() {
 
 }
 
-func (this *HandleTable) applyToAllCacheEntries(fun func(*LRUHandle)) {
+func (this *HandleTable) ApplyToAllCacheEntries(fun func(*LRUHandle)) {
 	for i := uint32(0); i < this.lenght; i++ {
 		h := this.list[i];
 		for h != nil {
@@ -108,9 +116,13 @@ func (this *HandleTable) applyToAllCacheEntries(fun func(*LRUHandle)) {
 	}
 }
 
-//func (this *HandleTable) Release() {
-//	this.applyToAllCacheEntries(func(h *LRUHandle) {
-//		h.Free()
-//	})
-//	this.list = nil
-//}
+
+
+func (this *HandleTable) findPointer(key []byte, hash uint32) **LRUHandle {
+	ptr := &this.list[hash&(this.lenght-1)]
+	for ; *ptr != nil &&
+		((*ptr).hash != hash || bytes.Compare(key, (*ptr).key) != 0); {
+		ptr = &(*ptr).next_hash
+	}
+	return ptr
+}

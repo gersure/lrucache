@@ -1,187 +1,165 @@
 package lrucache
 
 import (
+	"errors"
 	"sync"
-	"unsafe"
 )
 
 type LRUCacheShard struct {
 	capacity uint64
 	mutex    sync.Mutex
-	usage    uint64
-	lru      LRUHandle
-	in_use   LRUHandle
+	usage    uint64    // usage of memory
+	lrulist  LRUHandle // head of lru list;    lru.prev is newest entry, lru.next is oldest entry
 	table    HandleTable
 }
 
 func NewLRUCacheShard(capacity uint64) *LRUCacheShard {
-	lru_shared := &LRUCacheShard{capacity: 0,
-		usage: 0,
-		table: *NewLRUHandleTable(),
+	lru_shared := &LRUCacheShard{
+		capacity: 0,
+		usage:    0,
+		table:    *NewLRUHandleTable(),
 	}
 
-	lru_shared.lru.next = &(lru_shared.lru)
-	lru_shared.lru.prev = &(lru_shared.lru)
-	lru_shared.in_use.next = &lru_shared.in_use
-	lru_shared.in_use.prev = &lru_shared.in_use
+	lru_shared.lrulist.next = &(lru_shared.lrulist)
+	lru_shared.lrulist.prev = &(lru_shared.lrulist)
 	lru_shared.SetCapacity(capacity)
 
 	return lru_shared
 }
 
-func (this *LRUCacheShard) SetCapacity(capacity uint64) {
-	this.capacity = capacity
-}
-
-func (this *LRUCacheShard) Distroy() {
-	if (this.in_use.next != &this.in_use) {
-		panic("caller has an unreleased handle")
-	}
-
-	for e := this.lru.next; e != &this.lru; {
-		next := e.next
-		if (!e.in_cache) {
-			panic("handle not in cache")
-		}
-		e.in_cache = false
-		if (e.refs != 1) {
-			panic(" handle refs is not 1")
-		}
-		this.Unref(e);
-		e = next;
-	}
-}
-
-func (this *LRUCacheShard) Ref(e *LRUHandle) {
-	if e.refs == 1 && e.in_cache {
-		this.LRU_Remove(e)
-		this.LRU_Append(&this.in_use, e)
-	}
-	e.refs++
-}
-
-func (this *LRUCacheShard) Unref(e *LRUHandle) {
-	if e.refs <= 0 {
-		panic("refs <= 0")
-	}
-	e.refs--
-
-	if (e.refs == 0) { // Deallocate.
-		if e.in_cache {
-			panic("handle still in cache ")
-		}
-		(e.deleter)(e.key, e.value);
-	} else if (e.in_cache && e.refs == 1) {
-		// No longer in use; move to lru_ list.
-		this.LRU_Remove(e);
-		this.LRU_Append(&this.lru, e);
-	}
-}
-
-func (this *LRUCacheShard) LRU_Remove(e *LRUHandle) {
-	e.next.prev = e.prev
-	e.prev.next = e.next
-}
-
-func (this *LRUCacheShard) LRU_Append(list *LRUHandle, e *LRUHandle) {
-	// Make "e" newest entry by inserting just before *list
-	e.next = list;
-	e.prev = list.prev;
-	e.prev.next = e;
-	e.next.prev = e;
-}
-
-func (this *LRUCacheShard) Lookup(key []byte, hash uint32) *LRUHandle {
-	this.mutex.Lock();
-	defer this.mutex.Unlock();;
-	e := this.table.Lookup(key, hash);
-	if (e != nil) {
-		this.Ref(e)
-	}
-	return e;
-}
-
-func (this *LRUCacheShard) Release(handle *LRUHandle) {
-	this.mutex.Lock();
-	defer this.mutex.Unlock();;
-	this.Unref((*LRUHandle)(unsafe.Pointer(handle)));
-}
-
+/**
+create lruhandle and Insert to cache,
+*/
 func (this *LRUCacheShard) Insert(key []byte, hash uint32, value []byte, charge uint64,
-	deleter func(key, value []byte)) *LRUHandle {
-	// Allocate the memory here outside of the mutex
+	deleter func(key, value []byte)) error {
+
 	// If the cache is full, we'll have to release it
 	// It shouldn't happen very often though.
+	var err error = nil
+	this.mutex.Lock();
+	defer this.mutex.Unlock();;
 	e := &LRUHandle{
-		value:    value,
-		deleter:  deleter,
-		charge:   charge,
-		hash:     hash,
-		in_cache: false,
-		refs:     1,
-		key:      key,
+		value:   value,
+		deleter: deleter,
+		charge:  charge,
+		hash:    hash,
+		key:     key,
 	};
+
+	// if capacity == 0; will turn off caching
 	if this.capacity > 0 {
-		e.refs++
-		e.in_cache = true
-		this.LRU_Append(&this.in_use, e)
-		this.usage += charge
-		this.FinishErase(this.table.Insert(e))
+		this.lru_insert(e, charge)
 	} else {
-		e.next = nil
+		err = errors.New("cache is turn off")
 	}
 
-	for this.usage > this.capacity && this.lru.next != &this.lru {
-		old := this.lru.next
-		if old.refs != 1 {
-			panic("old refs != 1")
-		}
-		erase := this.FinishErase(this.table.Remove(old.key, old.hash))
-		if !erase {
-			panic("FinishErase")
-		}
+	for this.usage > this.capacity && this.lrulist.next != &this.lrulist {
+		old := this.lrulist.next
+		this.lru_remove_handle(old, true)
 	}
-	return e
+
+	return err
 }
 
-// If e != nullptr, finish removing *e from the cache; it has already been
-// removed from the hash table.  Return whether e != nullptr.
-func (this *LRUCacheShard) FinishErase(e *LRUHandle) bool {
-	if (e != nil) {
-		if !e.in_cache {
-			panic("handle not in cache")
-		}
-		this.LRU_Remove(e);
-		e.in_cache = false;
-		this.usage -= e.charge;
-		this.Unref(e);
-	}
-	return e != nil;
-}
-
-func (this *LRUCacheShard) Erase(key []byte, hash uint32) {
+func (this *LRUCacheShard) Remove(key []byte, hash uint32) []byte {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
-	this.FinishErase(this.table.Remove(key, hash))
+	return this.lru_remove(key, hash)
 }
+
 
 func (this *LRUCacheShard) Prune() {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
-	for this.lru.next != &this.lru {
-		e := this.lru.next;
-		if e.refs != 1 {
-			panic("old refs != 1")
-		}
-		erased := this.FinishErase(this.table.Remove(e.key, e.hash));
-		if (!erased) { // to avoid unused variable when compiled NDEBUG
-			panic("FinishErase")
-		}
+	for this.lrulist.next != &this.lrulist {
+		e := this.lrulist.next;
+		this.lru_remove_handle(e, true)
 	}
+}
+
+func (this *LRUCacheShard) SetCapacity(capacity uint64) {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+	this.capacity = capacity
+
 }
 
 func (this *LRUCacheShard) TotalCharge() uint64 {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	return this.usage;
+}
+
+
+/**
+find key's lruhandle, return nil if not find;
+*/
+func (this *LRUCacheShard) Lookup(key []byte, hash uint32) []byte {
+	this.mutex.Lock();
+	defer this.mutex.Unlock();;
+	e := this.table.Lookup(key, hash);
+	if e != nil {
+		this.list_update(e)
+		return e.value
+	}
+	return nil;
+}
+
+/*********** lru method *************/
+
+func (this *LRUCacheShard) lru_remove(key []byte, hash uint32) []byte {
+	e := this.table.Lookup(key, hash);
+	if e != nil {
+		this.lru_remove_handle(e, true)
+		return e.value
+	}
+	return nil
+}
+
+/**
+lru Remove; if table Insert return's handle, it's aready removed from table,
+so also_table is flase
+*/
+func (this *LRUCacheShard) lru_remove_handle(e *LRUHandle, also_table bool) {
+	if also_table {
+		this.table.Remove(e.key, e.hash)
+	}
+	this.list_remove(e)
+	if (e.deleter != nil) {
+		e.deleter(e.key, e.value)
+	}
+	this.usage -= e.charge;
+}
+
+func (this *LRUCacheShard) lru_insert(e *LRUHandle, charge uint64) {
+	this.list_append(e)
+	this.usage += charge
+	old := this.table.Insert(e)
+	if old != nil {
+		//don't need table.Remove; it's aready removed
+		this.lru_remove_handle(old, false)
+	}
+}
+
+/*********** lru list method *************/
+
+func (this *LRUCacheShard) list_remove(e *LRUHandle) {
+	e.next.prev = e.prev
+	e.prev.next = e.next
+}
+
+/*
+	Insert before list
+*/
+func (this *LRUCacheShard) list_append(e *LRUHandle) {
+	list := &this.lrulist
+	e.next = list;
+	e.prev = list.prev;
+	e.prev.next = e;
+	e.next.prev = e;
+}
+
+func (this *LRUCacheShard) list_update(e *LRUHandle) {
+	this.list_remove(e)
+	this.list_append(e)
 }
