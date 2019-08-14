@@ -31,7 +31,7 @@ var case_cache = []struct{
 	key []byte
 	value string
 	charge uint64
-	deleter deleter_callback
+	deleter DeleteCallback
 } {
 	{[]byte("key0"),("value0"), 10, nil},
 	{[]byte("key1"),("value1"), 15, nil},
@@ -241,14 +241,14 @@ func TestLRUCache_LRUCharge(t *testing.T) {
 func TestLRUCache_MergeAdd(t *testing.T) {
 
 	var capacity uint64 = 1024*1024
-	var merge_opt merge_operator = func(old_entry, new_entry interface{}) interface{} {
+	var merge_opt MergeOperator = func(old_entry, new_entry interface{}) interface{} {
 		old, _ := old_entry.(int)
 		new, _ := new_entry.(int)
 		res := old + new
 		return res
 	}
 
-	var charge_opt charge_operator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
+	var charge_opt ChargeOperator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
 		return old_charge
 	}
 
@@ -274,14 +274,14 @@ func TestLRUCache_MergeAdd(t *testing.T) {
 func TestLRUCache_MergeAppend(t *testing.T) {
 
 	var capacity uint64 = 1024*1024
-	var merge_opt merge_operator = func(old_entry, new_entry interface{}) interface{} {
+	var merge_opt MergeOperator = func(old_entry, new_entry interface{}) interface{} {
 		old, _ := old_entry.(string)
 		new, _ := new_entry.(string)
 		res := old + new
 		return res
 	}
 
-	var charge_opt charge_operator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
+	var charge_opt ChargeOperator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
 		return old_charge
 	}
 

@@ -30,7 +30,7 @@ func NewLRUCacheShard(capacity uint64) *LRUCacheShard {
 /**
 create lruhandle and Insert to cache,
 */
-func (this *LRUCacheShard) Insert(key []byte, hash uint32, entry interface{}, charge uint64, deleter deleter_callback) error {
+func (this *LRUCacheShard) Insert(key []byte, hash uint32, entry interface{}, charge uint64, deleter DeleteCallback) error {
 
 	// If the cache is full, we'll have to release it
 	// It shouldn't happen very often though.
@@ -52,7 +52,7 @@ func (this *LRUCacheShard) Lookup(key []byte, hash uint32) interface{} {
 	return nil;
 }
 
-func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, charge uint64, merge merge_operator, charge_opt charge_operator) {
+func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, charge uint64, merge MergeOperator, charge_opt ChargeOperator) {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	e := this.handle_lookup_update(key, hash)
@@ -99,7 +99,7 @@ func (this *LRUCacheShard) TotalCharge() uint64 {
 
 /*********** lru method *************/
 
-func (this *LRUCacheShard) insert(key []byte, hash uint32, entry interface{}, charge uint64, deleter deleter_callback) error {
+func (this *LRUCacheShard) insert(key []byte, hash uint32, entry interface{}, charge uint64, deleter DeleteCallback) error {
 	var err error
 	e := &LRUHandle{
 		entry:   entry,

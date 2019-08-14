@@ -80,7 +80,7 @@ func (this *LRUCache) shard(hash uint32) uint32 {
 	return 0
 }
 
-func (this *LRUCache) Insert(key []byte, entry interface{}, charge uint64,	deleter deleter_callback) {
+func (this *LRUCache) Insert(key []byte, entry interface{}, charge uint64,	deleter DeleteCallback) {
 	hash := HashSlice(key);
 	this.shards[this.shard(hash)].Insert(key, hash, entry, charge, deleter);
 }
@@ -96,7 +96,7 @@ func (this *LRUCache) Remove(key []byte) interface{} {
 }
 
 
-func (this *LRUCache) Merge(key []byte, entry interface{}, charge uint64, merge_opt merge_operator, charge_opt charge_operator) {
+func (this *LRUCache) Merge(key []byte, entry interface{}, charge uint64, merge_opt MergeOperator, charge_opt ChargeOperator) {
 	hash := HashSlice(key);
 	this.shards[this.shard(hash)].Merge(key, hash, entry, charge, merge_opt, charge_opt);
 }

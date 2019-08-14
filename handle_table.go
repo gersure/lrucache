@@ -7,7 +7,7 @@ import (
 
 type LRUHandle struct {
 	entry     interface{}
-	deleter   deleter_callback
+	deleter   DeleteCallback
 	next_hash *LRUHandle
 	next      *LRUHandle;
 	prev      *LRUHandle;
