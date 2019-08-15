@@ -105,12 +105,12 @@ func (this *HandleTable) Resize() {
 
 }
 
-func (this *HandleTable) ApplyToAllCacheEntries(fun func(*LRUHandle)) {
+func (this *HandleTable) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
 	for i := uint32(0); i < this.lenght; i++ {
 		h := this.list[i];
 		for h != nil {
 			n := h.next_hash;
-			fun(h);
+			travel_fun(h.key, h.entry);
 			h = n;
 		}
 	}

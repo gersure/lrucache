@@ -238,36 +238,92 @@ func TestLRUCache_LRUCharge(t *testing.T) {
 }
 
 
-func TestLRUCache_MergeAdd(t *testing.T) {
+func TestLRUCache_MergeAddInt(t *testing.T) {
 
-	var capacity uint64 = 1024*1024
-	var merge_opt MergeOperator = func(old_entry, new_entry interface{}) interface{} {
-		old, _ := old_entry.(int)
-		new, _ := new_entry.(int)
-		res := old + new
-		return res
-	}
-
-	var charge_opt ChargeOperator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
-		return old_charge
-	}
+	var capacity uint64 = 1024 * 1024
 
 	key := []byte("key")
 	var value int = 0
 	var merge_value int = 1
-	var res_total = 0
+	var res_total= 0
 	lru := NewLRUCache(capacity, 1)
 	lru.Insert(key, value, 4, nil)
-	for i:=0 ; i<1000; i++ {
-		lru.Merge(key, merge_value, 0, merge_opt, charge_opt)
+	for i := 0; i < 1000; i++ {
+		lru.Merge(key, merge_value, 4, IntMergeOperator, IntChargeOperator)
 		res_total += merge_value
 		res := lru.Lookup(key)
-		add_res,_ := res.(int)
+		add_res, _ := res.(int)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
 		}
 	}
 
+	merge_value = merge_value * (-1)
+	for i := 0; i < 1000; i++ {
+		lru.Merge(key, merge_value, 4, IntMergeOperator, IntChargeOperator)
+		res_total += merge_value
+		res := lru.Lookup(key)
+		add_res, _ := res.(int)
+		if add_res != res_total {
+			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
+		}
+	}
+
+	lru.Remove(key)
+	for i := 0; i < 1000; i++ {
+		lru.Merge(key, merge_value, 4, IntMergeOperator, IntChargeOperator)
+		res_total += merge_value
+		res := lru.Lookup(key)
+		add_res, _ := res.(int)
+		if add_res != res_total {
+			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
+		}
+	}
+
+}
+
+
+func TestLRUCache_MergeAddInt64(t *testing.T) {
+
+	var capacity uint64 = 1024*1024
+
+	key := []byte("key64")
+	var value int64 = 0
+	var merge_value int64 = 1
+	var res_total int64= 0
+	lru := NewLRUCache(capacity, 1)
+	lru.Insert(key, value, 4, nil)
+	for i:=0 ; i<1000; i++ {
+		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
+		res_total += merge_value
+		res := lru.Lookup(key)
+		add_res,_ := res.(int64)
+		if add_res != res_total {
+			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
+		}
+	}
+
+	merge_value = merge_value*(-1)
+	for i:=0 ; i<1000; i++ {
+		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
+		res_total += merge_value
+		res := lru.Lookup(key)
+		add_res,_ := res.(int64)
+		if add_res != res_total {
+			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
+		}
+	}
+
+	lru.Remove(key)
+	for i:=0 ; i<1000; i++ {
+		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
+		res_total += merge_value
+		res := lru.Lookup(key)
+		add_res,_ := res.(int64)
+		if add_res != res_total {
+			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
+		}
+	}
 }
 
 
@@ -286,14 +342,12 @@ func TestLRUCache_MergeAppend(t *testing.T) {
 	}
 
 	key := []byte("key")
-	var value string
 	merge_value := "1"
 	var res_total string
 	var capacity_totoal uint64 = 0
 	var res_string string
 
 	lru := NewLRUCache(capacity, 1)
-	lru.Insert(key, value, 0, nil)
 	for i:=0 ; i<100; i++ {
 		old_origin := lru.Merge(key, merge_value, uint64(len(merge_value)), merge_opt, charge_opt)
 		res_string += merge_value
@@ -314,5 +368,64 @@ func TestLRUCache_MergeAppend(t *testing.T) {
 			t.Errorf("merge return old entry error; expected:%s, got:%s", res_string[:(len(res_string)-1)], old_origin)
 		}
 	}
+}
 
+func TestLRUCache_ApplyToAllCacheEntries(t *testing.T) {
+	lru := NewLRUCache(1024*1024, 1)
+	for _, test_bar := range case_cache {
+		lru.Put(string(test_bar.key), string(test_bar.value))
+	}
+	var case_count = 0
+	lru.ApplyToAllCacheEntries(func(key []byte, entry interface{}) {
+		case_count++;
+	})
+
+	if case_count != len(case_cache) {
+		t.Errorf("ApplyToAllCacheEntries error, apply count:%d, but this's:%d", case_count, len(case_cache))
+	}
+}
+
+func TestLRUCache_SetCapacity(t *testing.T) {
+
+	lru := NewLRUCache(1024*1024, 1)
+	for _, test_bar := range case_cache {
+		lru.Put(string(test_bar.key), string(test_bar.value))
+	}
+	var case_count = 0
+	lru.SetCapacity(uint64(0))
+
+	lru.ApplyToAllCacheEntries(func(key []byte, entry interface{}) {
+		case_count++;
+	})
+
+	if case_count != 0 {
+		t.Errorf("trun off cache error, this's [%d] entry in cache", case_count)
+	}
+
+	if lru.TotalCharge() != 0 {
+		t.Errorf("turn off cache, but totalusage already has:%v", lru.TotalCharge())
+	}
+}
+
+
+func TestLRUCache_Prune(t *testing.T) {
+
+	lru := NewLRUCache(1024*1024, 1)
+	for _, test_bar := range case_cache {
+		lru.Put(string(test_bar.key), string(test_bar.value))
+	}
+	var case_count = 0
+	lru.Prune()
+
+	lru.ApplyToAllCacheEntries(func(key []byte, entry interface{}) {
+		case_count++;
+	})
+
+	if case_count != 0 {
+		t.Errorf("trun off cache error, this's [%d] entry in cache", case_count)
+	}
+
+	if lru.TotalCharge() != 0 {
+		t.Errorf("turn off cache, but totalusage already has:%v", lru.TotalCharge())
+	}
 }

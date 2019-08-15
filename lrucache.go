@@ -1,6 +1,7 @@
 package lrucache
 
 import (
+	"sync"
 	"sync/atomic"
 )
 
@@ -10,12 +11,13 @@ type LRUCache struct {
 	atomic_last_id uint64;
 	capacity       uint64;
 	num_shard_bits uint; // must < 10
+	mutex          sync.Mutex
 }
 
 func NewLRUCache(capacity uint64, num_shard_bits uint) *LRUCache {
 
 	if num_shard_bits >= 10 {
-		panic("num_shard_bits must < 20")
+		panic("num_shard_bits must < 10")
 	}
 
 	if num_shard_bits <= 0 {
@@ -29,7 +31,7 @@ func NewLRUCache(capacity uint64, num_shard_bits uint) *LRUCache {
 	}
 
 	num_shards := 1 << num_shard_bits
-	per_shard := (capacity + uint64(num_shards-1)) / uint64(num_shards);
+	per_shard := getPerfShardCapacity(capacity, num_shard_bits);
 	for i := 0; i < num_shards; i++ {
 		cache.shards = append(cache.shards, NewLRUCacheShard(per_shard))
 	}
@@ -59,6 +61,8 @@ func (this *LRUCache) NewId() uint64 {
 }
 
 func (this *LRUCache) Prune() {
+	this.mutex.Lock();
+	defer this.mutex.Unlock();
 	num_shards := (1 << this.num_shard_bits)
 	for s := 0; s < num_shards; s++ {
 		this.shards[s].Prune();
@@ -99,6 +103,28 @@ func (this *LRUCache) Remove(key []byte) interface{} {
 func (this *LRUCache) Merge(key []byte, entry interface{}, charge uint64, merge_opt MergeOperator, charge_opt ChargeOperator) (interface{}) {
 	hash := HashSlice(key);
 	return this.shards[this.shard(hash)].Merge(key, hash, entry, charge, merge_opt, charge_opt);
+}
+
+func (this *LRUCache) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
+	this.mutex.Lock();
+	defer this.mutex.Unlock();
+	for _, shard := range this.shards {
+		shard.ApplyToAllCacheEntries(travel_fun)
+	}
+}
+
+func (this *LRUCache) SetCapacity(capacity uint64)  {
+	this.mutex.Lock();
+	defer this.mutex.Unlock();
+	per_shard := getPerfShardCapacity(capacity, this.num_shard_bits)
+	for _, shard := range this.shards {
+		shard.SetCapacity(per_shard)
+	}
+}
+
+func getPerfShardCapacity(capacity uint64, num_shard_bits uint) uint64 {
+	num_shards := 1 << num_shard_bits
+	return (capacity + uint64(num_shards-1)) / uint64(num_shards);
 }
 
 func getDefaultCacheShardBits(capacity uint64) uint {

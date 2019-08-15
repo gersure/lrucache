@@ -59,8 +59,10 @@ func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, cha
 	var new_value interface{}
 	var new_charge uint64
 	var res interface{}
+	var deleter DeleteCallback = nil
 	if e != nil {
 		res = e.entry
+		deleter = e.deleter
 		new_value = merge(e.entry, entry)
 		new_charge = charge_opt(entry, e.charge, charge)
 	}else{
@@ -68,7 +70,7 @@ func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, cha
 		new_value = merge(nil, entry)
 		new_charge = charge_opt(entry, 0, charge)
 	}
-	this.insert(key, hash, new_value, new_charge, e.deleter)
+	this.insert(key, hash, new_value, new_charge, deleter)
 	return res
 }
 
@@ -76,6 +78,12 @@ func (this *LRUCacheShard) Remove(key []byte, hash uint32) interface{} {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	return this.lru_remove(key, hash)
+}
+
+func (this *LRUCacheShard) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
+	this.mutex.Lock();
+	defer this.mutex.Unlock();
+	this.table.ApplyToAllCacheEntries(travel_fun)
 }
 
 func (this *LRUCacheShard) Prune() {
@@ -91,7 +99,7 @@ func (this *LRUCacheShard) SetCapacity(capacity uint64) {
 	this.mutex.Lock()
 	defer this.mutex.Unlock()
 	this.capacity = capacity
-
+	this.EvictLRU()
 }
 
 func (this *LRUCacheShard) TotalCharge() uint64 {
@@ -120,10 +128,7 @@ func (this *LRUCacheShard) insert(key []byte, hash uint32, entry interface{}, ch
 		err = errors.New("cache is turn off")
 	}
 
-	for this.usage > this.capacity && this.lrulist.next != &this.lrulist {
-		old := this.lrulist.next
-		this.lru_remove_handle(old, true)
-	}
+	this.EvictLRU()
 
 	return err
 }
@@ -139,6 +144,13 @@ func (this *LRUCacheShard) handle_lookup_update(key []byte, hash uint32) *LRUHan
 		this.list_update(e)
 	}
 	return e;
+}
+
+func (this *LRUCacheShard) EvictLRU()  {
+	for this.usage > this.capacity && this.lrulist.next != &this.lrulist {
+		old := this.lrulist.next
+		this.lru_remove_handle(old, true)
+	}
 }
 
 /*********** lru method *************/
