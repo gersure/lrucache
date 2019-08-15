@@ -39,4 +39,15 @@ when memory use up to capacity; Earliest insert will be drop
 	}
 ```
 
+### method 3; use like redis incr;but merge return old value
+```go
+
+	key := []byte("key")
+	var merge_value int = 1
+	lru := NewLRUCache(1024, 1)
+	for i := 0; i < 1000; i++ {
+		lru.Merge(key, merge_value, 4, IntMergeOperator, IntChargeOperator) // real value = value+1
+	}
+```
+
 ### more use case, you can see lrucache_test.go
