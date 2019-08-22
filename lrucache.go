@@ -62,6 +62,9 @@ func DefaultLRUCache() *LRUCache  {
 	}
 }
 
+/**
+	namespace max len is 10; and key's namespace's charge doesn't caculate
+ */
 func NewLRUCache(namespace string) (*LRUCache, bool) {
 	if s_lru_cache == nil {
 		panic("use LRUCache must InitLRUCache first")
@@ -140,7 +143,7 @@ func (this *LRUCache) shard(hash uint32) uint32 {
 func (this *LRUCache) Insert(key []byte, entry interface{}, charge uint64,	deleter DeleteCallback) {
 	realkey := keyAdaptNamespace(key, this.namespace)
 	hash := HashSlice(realkey);
-	this.shards[this.shard(hash)].Insert(realkey, hash, entry, charge+namespace_byte_len, deleter);
+	this.shards[this.shard(hash)].Insert(realkey, hash, entry, charge, deleter);
 }
 
 func (this *LRUCache) Lookup(key []byte) interface{} {

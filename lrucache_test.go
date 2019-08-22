@@ -96,7 +96,7 @@ func TestLRUCache_PutGetDelete(t *testing.T) {
 		var total_charge uint64= 0
 		for _, test_bar := range case_cache {
 			lru.Put(string(test_bar.key[:]), (test_bar.value))
-			total_charge += (uint64(len(test_bar.key)+len(test_bar.value)) + namespace_byte_len)
+			total_charge += (uint64(len(test_bar.key)+len(test_bar.value)) )
 
 			origin, _ := lru.Get(string(test_bar.key))
 			if origin != test_bar.value {
@@ -114,7 +114,7 @@ func TestLRUCache_PutGetDelete(t *testing.T) {
 	lru := DefaultLRUCache()
 	for _, test_bar := range case_cache {
 		lru.Put(string(test_bar.key), string(test_bar.value))
-		total_charge += uint64(len(test_bar.key)+len(test_bar.value) + namespace_byte_len)
+		total_charge += uint64(len(test_bar.key)+len(test_bar.value) )
 		origin,_ := lru.Get(string(test_bar.key))
 		if origin != string(test_bar.value) {
 			t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
@@ -124,7 +124,7 @@ func TestLRUCache_PutGetDelete(t *testing.T) {
 		}
 
 		lru.Delete(string(test_bar.key))
-		total_charge -= uint64(len(test_bar.key)+len(test_bar.value) + namespace_byte_len)
+		total_charge -= uint64(len(test_bar.key)+len(test_bar.value) )
 		if lru.TotalCharge() != total_charge {
 			t.Errorf("total charge expected: %v, got: %v", total_charge, lru.TotalCharge())
 		}
@@ -145,7 +145,7 @@ func TestLRUCache_InsertLookupRemove(t *testing.T) {
 		var total_charge uint64= 0
 		for _, test_bar := range case_cache {
 			lru.Insert(test_bar.key, test_bar.value, test_bar.charge, test_bar.deleter)
-			total_charge += (test_bar.charge + namespace_byte_len)
+			total_charge += (test_bar.charge )
 
 			origin := lru.Lookup(test_bar.key)
 			origin,_ = origin.(string)
@@ -164,7 +164,7 @@ func TestLRUCache_InsertLookupRemove(t *testing.T) {
 	lru := DefaultLRUCache()
 	for _, test_bar := range case_cache {
 		lru.Insert(test_bar.key, test_bar.value, test_bar.charge, test_bar.deleter)
-		total_charge += (test_bar.charge + namespace_byte_len)
+		total_charge += (test_bar.charge )
 		origin := lru.Lookup(test_bar.key)
 		origin,_ = origin.(string)
 		if origin != test_bar.value {
@@ -176,7 +176,7 @@ func TestLRUCache_InsertLookupRemove(t *testing.T) {
 
 		origin = lru.Remove(test_bar.key)
 		origin,_ = origin.(string)
-		total_charge -= (test_bar.charge + namespace_byte_len)
+		total_charge -= (test_bar.charge )
 		if (origin !=test_bar.value) {
 			t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
 		}
@@ -235,7 +235,7 @@ func TestLRUCache_LRUCharge(t *testing.T) {
 	for i:=0; i<10000; i++ {
 		key := []byte(strconv.FormatInt(int64(i), 10))
 		lru.Insert(key, key, 10, nil)
-		total_charge += (10 + namespace_byte_len)
+		total_charge += (10 )
 
 		if total_charge > (per_shard*uint64(num_shards)) {
 			if (now_deleted > 0) {
