@@ -5,16 +5,28 @@ import (
 	"sync/atomic"
 )
 
+const namespace_byte_len  = 10
+
+type name_space [10]byte
+
 // impl of interface Cache
-type LRUCache struct {
+type lru_cache struct {
 	shards         []*LRUCacheShard
 	atomic_last_id uint64;
 	capacity       uint64;
 	num_shard_bits uint; // must < 10
+	namespaces     map[name_space]*LRUCache
 	mutex          sync.Mutex
 }
 
-func NewLRUCache(capacity uint64, num_shard_bits uint) *LRUCache {
+type LRUCache struct {
+	lru_cache
+	namespace name_space
+}
+
+var s_lru_cache *lru_cache = nil
+
+func InitLRUCache(capacity uint64, num_shard_bits uint)  {
 
 	if num_shard_bits >= 10 {
 		panic("num_shard_bits must < 10")
@@ -24,7 +36,7 @@ func NewLRUCache(capacity uint64, num_shard_bits uint) *LRUCache {
 		num_shard_bits = getDefaultCacheShardBits(capacity)
 	}
 
-	cache := &LRUCache{
+	cache := &lru_cache{
 		num_shard_bits: num_shard_bits,
 		capacity:       capacity,
 		atomic_last_id: 1,
@@ -36,7 +48,48 @@ func NewLRUCache(capacity uint64, num_shard_bits uint) *LRUCache {
 		cache.shards = append(cache.shards, NewLRUCacheShard(per_shard))
 	}
 
-	return cache
+	s_lru_cache = cache
+}
+
+func DefaultLRUCache() *LRUCache  {
+	if s_lru_cache == nil {
+		panic("use LRUCache must InitLRUCache first")
+	}
+
+	return &LRUCache{
+		lru_cache: *s_lru_cache,
+		namespace: [10]byte{},
+	}
+}
+
+func NewLRUCache(namespace string) (*LRUCache, bool) {
+	if s_lru_cache == nil {
+		panic("use LRUCache must InitLRUCache first")
+	}
+
+	var tmp name_space
+	for i:=0; i<namespace_byte_len && i<len(namespace); i++ {
+		tmp[i] = namespace[i]
+	}
+
+	return getNamespace(tmp)
+}
+
+func getNamespace(namespace name_space) (*LRUCache, bool) {
+	var cache *LRUCache = nil
+	if  cache, ok := s_lru_cache.namespaces[namespace]; !ok {
+		s_lru_cache.mutex.Lock();
+		defer s_lru_cache.mutex.Unlock();
+		if  _, ok := s_lru_cache.namespaces[namespace]; !ok {
+			cache = &LRUCache{
+				lru_cache: *s_lru_cache,
+				namespace: namespace,
+			}
+			s_lru_cache.namespaces[namespace] = cache
+			return cache, true
+		}
+	}
+	return cache, false
 }
 
 func (this *LRUCache) Put(key, value string) {
@@ -85,24 +138,28 @@ func (this *LRUCache) shard(hash uint32) uint32 {
 }
 
 func (this *LRUCache) Insert(key []byte, entry interface{}, charge uint64,	deleter DeleteCallback) {
-	hash := HashSlice(key);
-	this.shards[this.shard(hash)].Insert(key, hash, entry, charge, deleter);
+	realkey := keyAdaptNamespace(key, this.namespace)
+	hash := HashSlice(realkey);
+	this.shards[this.shard(hash)].Insert(realkey, hash, entry, charge+namespace_byte_len, deleter);
 }
 
 func (this *LRUCache) Lookup(key []byte) interface{} {
-	hash := HashSlice(key);
-	return this.shards[this.shard(hash)].Lookup(key, hash);
+	realkey := keyAdaptNamespace(key, this.namespace)
+	hash := HashSlice(realkey);
+	return this.shards[this.shard(hash)].Lookup(realkey, hash);
 }
 
 func (this *LRUCache) Remove(key []byte) interface{} {
-	hash := HashSlice(key);
-	return this.shards[this.shard(hash)].Remove(key, hash);
+	realkey := keyAdaptNamespace(key, this.namespace)
+	hash := HashSlice(realkey);
+	return this.shards[this.shard(hash)].Remove(realkey, hash);
 }
 
 
 func (this *LRUCache) Merge(key []byte, entry interface{}, charge uint64, merge_opt MergeOperator, charge_opt ChargeOperator) (interface{}) {
-	hash := HashSlice(key);
-	return this.shards[this.shard(hash)].Merge(key, hash, entry, charge, merge_opt, charge_opt);
+	realkey := keyAdaptNamespace(key, this.namespace)
+	hash := HashSlice(realkey);
+	return this.shards[this.shard(hash)].Merge(realkey, hash, entry, charge, merge_opt, charge_opt);
 }
 
 func (this *LRUCache) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
@@ -140,4 +197,10 @@ func getDefaultCacheShardBits(capacity uint64) uint {
 		}
 	}
 	return num_shard_bits;
+}
+
+func keyAdaptNamespace(key []byte, namespace name_space) []byte  {
+	var real_key []byte
+	real_key = append(real_key, namespace[:]...)
+	return append(real_key, key...)
 }
