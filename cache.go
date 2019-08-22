@@ -1,6 +1,9 @@
 package lrucache
 
-import "reflect"
+import (
+	"reflect"
+	"unsafe"
+)
 
 type DeleteCallback func(key []byte, entry interface{})
 type MergeOperator func(old_entry, new_entry interface{}) interface{}
@@ -40,7 +43,8 @@ var IntMergeOperator MergeOperator = func(old_entry, new_entry interface{}) inte
 }
 
 var IntChargeOperator ChargeOperator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
-	return 8
+	var a int
+	return uint64(unsafe.Sizeof(a))
 }
 
 
@@ -61,7 +65,8 @@ var Int64MergeOperator MergeOperator = func(old_entry, new_entry interface{}) in
 }
 
 var Int64ChargeOperator ChargeOperator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
-	return 8
+	var a int64
+	return uint64(unsafe.Sizeof(a))
 }
 
 
