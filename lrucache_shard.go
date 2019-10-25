@@ -6,11 +6,12 @@ import (
 )
 
 type LRUCacheShard struct {
-	capacity uint64
-	mutex    sync.Mutex
-	usage    uint64    // usage of memory
-	lrulist  LRUHandle // head of lru list;    lru.prev is newest entry, lru.next is oldest entry
-	table    HandleTable
+	capacity   uint64
+	mutex      sync.Mutex
+	usage      uint64    // usage of memory
+	lrulist    LRUHandle // head of lru list;    lru.prev is newest entry, lru.next is oldest entry
+	table      HandleTable
+	handlePool sync.Pool
 }
 
 func NewLRUCacheShard(capacity uint64) *LRUCacheShard {
@@ -18,6 +19,11 @@ func NewLRUCacheShard(capacity uint64) *LRUCacheShard {
 		capacity: 0,
 		usage:    0,
 		table:    *NewLRUHandleTable(),
+		handlePool: sync.Pool{
+			New: func() interface{} {
+				return new(LRUHandle)
+			},
+		},
 	}
 
 	lru_shared.lrulist.next = &(lru_shared.lrulist)
@@ -65,7 +71,7 @@ func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, cha
 		deleter = e.deleter
 		new_value = merge(e.entry, entry)
 		new_charge = charge_opt(entry, e.charge, charge)
-	}else{
+	} else {
 		res = nil
 		new_value = merge(nil, entry)
 		new_charge = charge_opt(entry, 0, charge)
@@ -108,22 +114,21 @@ func (this *LRUCacheShard) TotalCharge() uint64 {
 	return this.usage;
 }
 
-
 /*********** lru method *************/
 
 func (this *LRUCacheShard) insert(key []byte, hash uint32, entry interface{}, charge uint64, deleter DeleteCallback) error {
 	var err error
-	e := &LRUHandle{
-		entry:   entry,
-		deleter: deleter,
-		charge:  charge,
-		hash:    hash,
-		key:     key,
-	};
+	e := this.handlePool.Get()
+	handle := e.(*LRUHandle)
+	handle.entry = entry
+	handle.deleter = deleter
+	handle.charge = charge
+	handle.hash = hash
+	handle.key = key
 
 	// if capacity == 0; will turn off caching
 	if this.capacity > 0 {
-		this.lru_insert(e, charge)
+		this.lru_insert(handle, charge)
 	} else {
 		err = errors.New("cache is turn off")
 	}
@@ -146,7 +151,7 @@ func (this *LRUCacheShard) handle_lookup_update(key []byte, hash uint32) *LRUHan
 	return e;
 }
 
-func (this *LRUCacheShard) EvictLRU()  {
+func (this *LRUCacheShard) EvictLRU() {
 	for this.usage > this.capacity && this.lrulist.next != &this.lrulist {
 		old := this.lrulist.next
 		this.lru_remove_handle(old, true)
@@ -177,6 +182,7 @@ func (this *LRUCacheShard) lru_remove_handle(e *LRUHandle, also_table bool) {
 		e.deleter(e.key, e.entry)
 	}
 	this.usage -= e.charge;
+	this.handlePool.Put(e)
 }
 
 func (this *LRUCacheShard) lru_insert(e *LRUHandle, charge uint64) {

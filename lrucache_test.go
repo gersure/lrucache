@@ -6,69 +6,77 @@ import (
 	"testing"
 )
 
-var case_shard_bits = []struct{
+var case_shard_bits = []struct {
 	capacity uint64
 	num_bits uint
 }{
-	{512*1024*1024, 6},
-	{512*1024*10, 4},
-	{512*1024*6, 3},
-	{512*1024*3, 2},
-	{512*1024*1, 1},
+	{512 * 1024 * 1024, 6},
+	{512 * 1024 * 10, 4},
+	{512 * 1024 * 6, 3},
+	{512 * 1024 * 3, 2},
+	{512 * 1024 * 1, 1},
 }
 
-func TestGetDefaultCacheShardBits(t *testing.T)  {
+func TestGetDefaultCacheShardBits(t *testing.T) {
 	for _, test := range case_shard_bits {
 		bits := getDefaultCacheShardBits(test.capacity)
 		if bits != test.num_bits {
-			t.Errorf("getDefaultCacheShardBits error, capacity is: %v," +
+			t.Errorf("getDefaultCacheShardBits error, capacity is: %v,"+
 				" expected: %d, got: %d", test.capacity, test.num_bits, bits)
 		}
 	}
 }
 
-var case_cache = []struct{
-	key []byte
-	value string
-	charge uint64
+var case_cache = []struct {
+	key     []byte
+	value   string
+	charge  uint64
 	deleter DeleteCallback
-} {
-	{[]byte("key0"),("value0"), 10, nil},
-	{[]byte("key1"),("value1"), 15, nil},
-	{[]byte("key2"),("value2"), 30, nil},
-	{[]byte("key3"),("value3"), 20, nil},
-	{[]byte("key4"),("value4"), 10, nil},
-	{[]byte("key5"),("value5"), 10, nil},
-	{[]byte("key6"),("value6"), 10, nil},
-	{[]byte("key7"),("value7"), 10, nil},
-	{[]byte("key8"),("value8"), 10, nil},
-	{[]byte("key9"),("value9"), 10, nil},
-	{[]byte("key10"),("value10"), 10, nil},
-	{[]byte("key11"),("value11"), 10, nil},
-	{[]byte("key12"),("value12"), 10, nil},
-	{[]byte("key13"),("value13"), 10, nil},
-	{[]byte("key14"),("value14"), 10, nil},
-	{[]byte("key15"),("value15"), 10, nil},
-	{[]byte("key16"),("value16"), 10, nil},
-	{[]byte("key17"),("value17"), 10, nil},
-	{[]byte("key18"),("value18"), 10, nil},
-	{[]byte("key19"),("value19"), 10, nil},
+}{
+	{[]byte("key0"), ("value0"), 10, nil},
+	{[]byte("key1"), ("value1"), 15, nil},
+	{[]byte("key2"), ("value2"), 30, nil},
+	{[]byte("key3"), ("value3"), 20, nil},
+	{[]byte("key4"), ("value4"), 10, nil},
+	{[]byte("key5"), ("value5"), 10, nil},
+	{[]byte("key6"), ("value6"), 10, nil},
+	{[]byte("key7"), ("value7"), 10, nil},
+	{[]byte("key8"), ("value8"), 10, nil},
+	{[]byte("key9"), ("value9"), 10, nil},
+	{[]byte("key10"), ("value10"), 10, nil},
+	{[]byte("key11"), ("value11"), 10, nil},
+	{[]byte("key12"), ("value12"), 10, nil},
+	{[]byte("key13"), ("value13"), 10, nil},
+	{[]byte("key14"), ("value14"), 10, nil},
+	{[]byte("key15"), ("value15"), 10, nil},
+	{[]byte("key16"), ("value16"), 10, nil},
+	{[]byte("key17"), ("value17"), 10, nil},
+	{[]byte("key18"), ("value18"), 10, nil},
+	{[]byte("key19"), ("value19"), 10, nil},
+}
+
+var namespace_case_cache = []string{
+	"1",
+	"2",
+	"3",
+	"4",
+	"5",
+	"6",
 }
 
 func TestInitLRUCache(t *testing.T) {
 	for _, test := range case_shard_bits {
 		InitLRUCache(test.capacity, 0)
 		lru := DefaultLRUCache()
-		if len(lru.shards) != (1<<test.num_bits) {
-			t.Errorf("InitLRUCache error, capacity is: %v," +
-				" shards expected: %d, got: %d", test.capacity, 1<<test.num_bits, len(lru.shards) )
+		if len(lru.shards) != (1 << test.num_bits) {
+			t.Errorf("InitLRUCache error, capacity is: %v,"+
+				" shards expected: %d, got: %d", test.capacity, 1<<test.num_bits, len(lru.shards))
 		}
 		if lru.TotalCharge() != 0 {
 			t.Errorf("totalcharge init error, got:%v", lru.TotalCharge())
 		}
 
-
-		if _, ok := lru.Get(("test"));ok {
+		if _, ok := lru.Get(("test")); ok {
 			t.Errorf("empty cache lookup isn't nil")
 		}
 
@@ -87,16 +95,15 @@ func TestInitLRUCache(t *testing.T) {
 
 }
 
-
 func TestLRUCache_PutGetDelete(t *testing.T) {
 	for _, test := range case_shard_bits {
 		InitLRUCache(test.capacity, 0)
 
 		lru := DefaultLRUCache()
-		var total_charge uint64= 0
+		var total_charge uint64 = 0
 		for _, test_bar := range case_cache {
 			lru.Put(string(test_bar.key[:]), (test_bar.value))
-			total_charge += (uint64(len(test_bar.key)+len(test_bar.value)) )
+			total_charge += (uint64(len(test_bar.key) + len(test_bar.value)))
 
 			origin, _ := lru.Get(string(test_bar.key))
 			if origin != test_bar.value {
@@ -108,14 +115,13 @@ func TestLRUCache_PutGetDelete(t *testing.T) {
 		}
 	}
 
-
-	var total_charge uint64= 0
+	var total_charge uint64 = 0
 	InitLRUCache(1024*1024, 1)
 	lru := DefaultLRUCache()
 	for _, test_bar := range case_cache {
 		lru.Put(string(test_bar.key), string(test_bar.value))
-		total_charge += uint64(len(test_bar.key)+len(test_bar.value) )
-		origin,_ := lru.Get(string(test_bar.key))
+		total_charge += uint64(len(test_bar.key) + len(test_bar.value))
+		origin, _ := lru.Get(string(test_bar.key))
 		if origin != string(test_bar.value) {
 			t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
 		}
@@ -124,7 +130,7 @@ func TestLRUCache_PutGetDelete(t *testing.T) {
 		}
 
 		lru.Delete(string(test_bar.key))
-		total_charge -= uint64(len(test_bar.key)+len(test_bar.value) )
+		total_charge -= uint64(len(test_bar.key) + len(test_bar.value))
 		if lru.TotalCharge() != total_charge {
 			t.Errorf("total charge expected: %v, got: %v", total_charge, lru.TotalCharge())
 		}
@@ -137,18 +143,37 @@ func TestLRUCache_PutGetDelete(t *testing.T) {
 
 }
 
+func TestNewLRUCache(t *testing.T) {
+	InitLRUCache(1024, 5)
+	lru_nil, _ := NewLRUCache("namespace_nil")
+	for _, namespace := range namespace_case_cache {
+		lru, _ := NewLRUCache(namespace)
+		for _, tcase := range case_cache {
+			lru.Insert(tcase.key, tcase.value, tcase.charge, tcase.deleter)
+
+			origin := lru.Lookup(tcase.key)
+			origin, _ = origin.(string)
+			if (origin != tcase.value) {
+				t.Errorf("insert key: %s ,value : %s, got value : %s", (tcase.key), (tcase.value), (origin))
+			}
+			if lru_nil.Lookup(tcase.key) != nil {
+				t.Errorf("insert key in namesapce [%s], got in [namesapce_nil]", namespace)
+			}
+		}
+	}
+}
 
 func TestLRUCache_InsertLookupRemove(t *testing.T) {
 	for _, test := range case_shard_bits {
 		InitLRUCache(test.capacity, 0)
 		lru := DefaultLRUCache()
-		var total_charge uint64= 0
+		var total_charge uint64 = 0
 		for _, test_bar := range case_cache {
 			lru.Insert(test_bar.key, test_bar.value, test_bar.charge, test_bar.deleter)
-			total_charge += (test_bar.charge )
+			total_charge += (test_bar.charge)
 
 			origin := lru.Lookup(test_bar.key)
-			origin,_ = origin.(string)
+			origin, _ = origin.(string)
 			if (origin != test_bar.value) {
 				t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
 			}
@@ -158,15 +183,14 @@ func TestLRUCache_InsertLookupRemove(t *testing.T) {
 		}
 	}
 
-
-	var total_charge uint64= 0
+	var total_charge uint64 = 0
 	InitLRUCache(1024*1024, 1)
 	lru := DefaultLRUCache()
 	for _, test_bar := range case_cache {
 		lru.Insert(test_bar.key, test_bar.value, test_bar.charge, test_bar.deleter)
-		total_charge += (test_bar.charge )
+		total_charge += (test_bar.charge)
 		origin := lru.Lookup(test_bar.key)
-		origin,_ = origin.(string)
+		origin, _ = origin.(string)
 		if origin != test_bar.value {
 			t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
 		}
@@ -175,9 +199,9 @@ func TestLRUCache_InsertLookupRemove(t *testing.T) {
 		}
 
 		origin = lru.Remove(test_bar.key)
-		origin,_ = origin.(string)
-		total_charge -= (test_bar.charge )
-		if (origin !=test_bar.value) {
+		origin, _ = origin.(string)
+		total_charge -= (test_bar.charge)
+		if (origin != test_bar.value) {
 			t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
 		}
 		if lru.TotalCharge() != total_charge {
@@ -194,10 +218,10 @@ func TestLRUCache_Deleter(t *testing.T) {
 	lru := DefaultLRUCache()
 	for _, test_bar := range case_cache {
 		lru.Insert(test_bar.key, test_bar.value, test_bar.charge, func(key []byte, entry interface{}) {
-			delete ++
-			entry,_ = entry.(string)
+			delete++
+			entry, _ = entry.(string)
 			if bytes.HasSuffix(test_bar.key, key) || test_bar.value != entry {
-				t.Errorf("put key: %s ,value: %s\n" +
+				t.Errorf("put key: %s ,value: %s\n"+
 					"got key: %s, value: %s", (test_bar.key), (test_bar.value), key, entry)
 			}
 		})
@@ -208,7 +232,6 @@ func TestLRUCache_Deleter(t *testing.T) {
 		t.Error("may be do't call deleter")
 	}
 }
-
 
 func TestLRUCache_LRUCharge(t *testing.T) {
 
@@ -221,8 +244,8 @@ func TestLRUCache_LRUCharge(t *testing.T) {
 		atomic_last_id: 1,
 	}
 	lru := LRUCache{
-		lru_cache:lru_cache,
-		namespace:name_space{},
+		lru_cache: lru_cache,
+		namespace: name_space{},
 	}
 	num_shards := 1
 	per_shard := (capacity + uint64(num_shards-1)) / uint64(num_shards);
@@ -232,23 +255,22 @@ func TestLRUCache_LRUCharge(t *testing.T) {
 
 	var total_charge uint64 = 0
 	var now_deleted int = 0
-	for i:=0; i<10000; i++ {
+	for i := 0; i < 10000; i++ {
 		key := []byte(strconv.FormatInt(int64(i), 10))
 		lru.Insert(key, key, 10, nil)
-		total_charge += (10 )
+		total_charge += (10)
 
-		if total_charge > (per_shard*uint64(num_shards)) {
+		if total_charge > (per_shard * uint64(num_shards)) {
 			if (now_deleted > 0) {
 				now_deleted_key := []byte(strconv.FormatInt(int64(now_deleted), 10))
 				if _, ok := lru.Get(string(now_deleted_key)); ok {
 					t.Errorf("now total charge: %v, but got before key:%s", lru.TotalCharge(), now_deleted_key)
 				}
 			}
-			now_deleted ++
+			now_deleted++
 		}
 	}
 }
-
 
 func TestLRUCache_MergeAddInt(t *testing.T) {
 
@@ -257,7 +279,7 @@ func TestLRUCache_MergeAddInt(t *testing.T) {
 	key := []byte("key")
 	var value int = 0
 	var merge_value int = 1
-	var res_total= 0
+	var res_total = 0
 	InitLRUCache(capacity, 1)
 	lru := DefaultLRUCache()
 	lru.Insert(key, value, 4, nil)
@@ -295,55 +317,53 @@ func TestLRUCache_MergeAddInt(t *testing.T) {
 
 }
 
-
 func TestLRUCache_MergeAddInt64(t *testing.T) {
 
-	var capacity uint64 = 1024*1024
+	var capacity uint64 = 1024 * 1024
 
 	key := []byte("key64")
 	var value int64 = 0
 	var merge_value int64 = 1
-	var res_total int64= 0
+	var res_total int64 = 0
 	InitLRUCache(capacity, 1)
 	lru := DefaultLRUCache()
 	lru.Insert(key, value, 4, nil)
-	for i:=0 ; i<1000; i++ {
+	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
 		res_total += merge_value
 		res := lru.Lookup(key)
-		add_res,_ := res.(int64)
+		add_res, _ := res.(int64)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
 		}
 	}
 
-	merge_value = merge_value*(-1)
-	for i:=0 ; i<1000; i++ {
+	merge_value = merge_value * (-1)
+	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
 		res_total += merge_value
 		res := lru.Lookup(key)
-		add_res,_ := res.(int64)
+		add_res, _ := res.(int64)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
 		}
 	}
 
 	lru.Remove(key)
-	for i:=0 ; i<1000; i++ {
+	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
 		res_total += merge_value
 		res := lru.Lookup(key)
-		add_res,_ := res.(int64)
+		add_res, _ := res.(int64)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
 		}
 	}
 }
 
-
 func TestLRUCache_MergeAppend(t *testing.T) {
 
-	var capacity uint64 = 1024*1024
+	var capacity uint64 = 1024 * 1024
 	var merge_opt MergeOperator = func(old_entry, new_entry interface{}) interface{} {
 		old, _ := old_entry.(string)
 		new, _ := new_entry.(string)
@@ -352,7 +372,7 @@ func TestLRUCache_MergeAppend(t *testing.T) {
 	}
 
 	var charge_opt ChargeOperator = func(entry interface{}, old_charge, new_charge uint64) uint64 {
-		return old_charge+new_charge
+		return old_charge + new_charge
 	}
 
 	key := []byte("key")
@@ -363,13 +383,13 @@ func TestLRUCache_MergeAppend(t *testing.T) {
 
 	InitLRUCache(capacity, 1)
 	lru := DefaultLRUCache()
-	for i:=0 ; i<100; i++ {
+	for i := 0; i < 100; i++ {
 		old_origin := lru.Merge(key, merge_value, uint64(len(merge_value)), merge_opt, charge_opt)
 		res_string += merge_value
 		capacity_totoal += uint64(len(merge_value))
 		res_total += merge_value
 		res := lru.Lookup(key)
-		add_res,_ := res.(string)
+		add_res, _ := res.(string)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%s, got:%s", res_total, add_res)
 		}
@@ -378,8 +398,8 @@ func TestLRUCache_MergeAppend(t *testing.T) {
 			t.Errorf("merge charge operator maybe error;expected:%v, got:%v", capacity_totoal, lru.TotalCharge())
 		}
 
-		old_origin,_ = old_origin.(string)
-		if len(res_string) >=2 && old_origin != res_string[:len(res_string)-1] {
+		old_origin, _ = old_origin.(string)
+		if len(res_string) >= 2 && old_origin != res_string[:len(res_string)-1] {
 			t.Errorf("merge return old entry error; expected:%s, got:%s", res_string[:(len(res_string)-1)], old_origin)
 		}
 	}
@@ -423,7 +443,6 @@ func TestLRUCache_SetCapacity(t *testing.T) {
 		t.Errorf("turn off cache, but totalusage already has:%v", lru.TotalCharge())
 	}
 }
-
 
 func TestLRUCache_Prune(t *testing.T) {
 
