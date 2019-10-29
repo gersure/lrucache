@@ -13,9 +13,9 @@ when memory use up to capacity; Earliest insert will be drop
 ## how to use
 ```go
         // before use must init cache to set capacity and bitset
-		InitLRUCache(test.capacity, 0)
+	InitLRUCache(test.capacity, 0)
         // this is default namespace [10]byte{}
-		lru := DefaultLRUCache()
+	lru := DefaultLRUCache()
         
         // to create a new namespace name1
         lru_name1 := NewLRUCache("names1")
