@@ -1,4 +1,4 @@
-module lrucache
+module github.com/zhengcf/lrucache
 
 go 1.12
 
