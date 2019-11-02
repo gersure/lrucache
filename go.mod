@@ -1,4 +1,4 @@
-module github.com/zhengcf/lrucache
+module github.com/GerSure/lrucache
 
 go 1.12
 
