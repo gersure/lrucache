@@ -75,10 +75,16 @@ func (this *LRUCacheShard) Lookup(key []byte, hash uint32) (interface{}, bool) {
 	return nil, false
 }
 
+
+/**
+manual reomve key
+if find return value and true
+if not find return nil and false
+*/
 func (this *LRUCacheShard) Remove(key []byte, hash uint32) (interface{}, bool) {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
-	return this.lru_remove(key, hash)
+	return this.lruRemove(key, hash)
 }
 
 func (this *LRUCacheShard) Reference(key []byte, hash uint32) (interface{}, bool) {
@@ -101,7 +107,7 @@ func (this *LRUCacheShard) Release(key []byte, hash uint32) {
 	}
 }
 
-func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, charge uint64, merge MergeOperator, charge_opt ChargeOperator) (interface{}) {
+func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, charge uint64, merge MergeOperator, charge_opt ChargeOperator) (interface{}, error) {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	e := this.handle_lookup_update(key, hash)
@@ -119,8 +125,8 @@ func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, cha
 		new_value = merge(nil, entry)
 		new_charge = charge_opt(entry, 0, charge)
 	}
-	this.insert(key, hash, new_value, new_charge, deleter)
-	return res
+	err := this.insert(key, hash, new_value, new_charge, deleter)
+	return res, err
 }
 
 func (this *LRUCacheShard) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
@@ -197,10 +203,12 @@ func (this *LRUCacheShard) EvictLRU() {
 
 /*********** lru method *************/
 
-func (this *LRUCacheShard) lru_remove(key []byte, hash uint32) (interface{}, bool) {
+func (this *LRUCacheShard) lruRemove(key []byte, hash uint32) (interface{}, bool) {
 	e := this.handle_lookup(key, hash);
 	if e != nil {
-		this.lru_remove_handle(e, true)
+		if !this.lru_remove_handle(e, true) {
+			return e.entry, false
+		}
 		return e.entry, true
 	}
 	return nil, false

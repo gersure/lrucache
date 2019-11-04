@@ -27,28 +27,21 @@ type MergeOperator func(old_entry, new_entry interface{}) interface{}
 type ChargeOperator func(entry interface{}, old_charge, new_charge uint64) uint64
 type TravelEntryOperator func(key []byte, entry interface{})
 
-type LRUCache interface {
+type Cache interface {
 	Put(key string, value string)
 	Get(key string) (string, bool)
 	Delete(key string)
-	Prune()
-	TotalCharge() uint64
-
 	Insert(key[]byte, entry interface{}, charge uint64, deleter DeleteCallback) error
 	Lookup(key []byte) (interface{}, bool)
 	Remove(key []byte) (interface{}, bool)
-	Merge(key []byte, entry interface{}, charge uint64,  merge_opt MergeOperator, charge_opt ChargeOperator) (old_entry interface{})
-	ApplyToAllCacheEntries(TravelEntryOperator)
-}
 
-type RefCache interface {
-	Insert(key[]byte, entry interface{}, charge uint64, deleter DeleteCallback) error
-	Lookup(key []byte) (interface{}, bool)
 	Reference(key []byte) (interface{}, bool)
 	Release(key []byte)
 
-	NewId() uint64
+	NewId(key string) (int64, error)
+	Prune()
 	TotalCharge() uint64
+	Merge(key []byte, entry interface{}, charge uint64,  merge_opt MergeOperator, charge_opt ChargeOperator) (old_entry interface{})
 	ApplyToAllCacheEntries(TravelEntryOperator)
 }
 
