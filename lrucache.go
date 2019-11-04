@@ -32,11 +32,11 @@ type lru_cache struct {
 	atomic_last_id uint64;
 	capacity       uint64;
 	num_shard_bits uint; // must < 10
-	namespaces     map[name_space]*LRUCache
+	namespaces     map[name_space]*implLRUCache
 	mutex          sync.Mutex
 }
 
-type LRUCache struct {
+type implLRUCache struct {
 	lru_cache
 	namespace name_space
 }
@@ -57,7 +57,7 @@ func InitLRUCache(capacity uint64, num_shard_bits uint) {
 		num_shard_bits: num_shard_bits,
 		capacity:       capacity,
 		atomic_last_id: 1,
-		namespaces:      make(map[name_space]*LRUCache),
+		namespaces:     make(map[name_space]*implLRUCache),
 	}
 
 	num_shards := 1 << num_shard_bits
@@ -69,12 +69,12 @@ func InitLRUCache(capacity uint64, num_shard_bits uint) {
 	s_lru_cache = cache
 }
 
-func DefaultLRUCache() *LRUCache {
+func DefaultLRUCache() LRUCache {
 	if s_lru_cache == nil {
 		panic("use LRUCache must InitLRUCache first")
 	}
 
-	return &LRUCache{
+	return &implLRUCache{
 		lru_cache: *s_lru_cache,
 		namespace: [10]byte{},
 	}
@@ -83,7 +83,7 @@ func DefaultLRUCache() *LRUCache {
 /**
 namespace max len is 10; and key's namespace's charge doesn't caculate
 */
-func NewLRUCache(namespace string) (*LRUCache, bool) {
+func NewLRUCache(namespace string) (LRUCache, bool) {
 	if s_lru_cache == nil {
 		panic("use LRUCache must InitLRUCache first")
 	}
@@ -96,13 +96,13 @@ func NewLRUCache(namespace string) (*LRUCache, bool) {
 	return getNamespace(tmp)
 }
 
-func getNamespace(namespace name_space) (*LRUCache, bool) {
-	var cache *LRUCache = nil
+func getNamespace(namespace name_space) (LRUCache, bool) {
+	var cache *implLRUCache = nil
 	if cache, ok := s_lru_cache.namespaces[namespace]; !ok {
 		s_lru_cache.mutex.Lock();
 		defer s_lru_cache.mutex.Unlock();
 		if _, ok := s_lru_cache.namespaces[namespace]; !ok {
-			cache = &LRUCache{
+			cache = &implLRUCache{
 				lru_cache: *s_lru_cache,
 				namespace: namespace,
 			}
@@ -113,12 +113,12 @@ func getNamespace(namespace name_space) (*LRUCache, bool) {
 	return cache, false
 }
 
-func (this *LRUCache) Put(key, value string) {
+func (this *implLRUCache) Put(key, value string) {
 	this.Insert([]byte(key), (value), uint64(len(key)+len(value)), nil)
 }
 
-func (this *LRUCache) Get(key string) (string, bool) {
-	value := this.Lookup([]byte(key))
+func (this *implLRUCache) Get(key string) (string, bool) {
+	value, _ := this.Lookup([]byte(key))
 	res, ok := value.(string)
 	if !ok {
 		return "", false
@@ -126,15 +126,15 @@ func (this *LRUCache) Get(key string) (string, bool) {
 	return res, true
 }
 
-func (this *LRUCache) Delete(key string) {
+func (this *implLRUCache) Delete(key string) {
 	this.Remove([]byte(key))
 }
 
-func (this *LRUCache) NewId() uint64 {
+func (this *implLRUCache) NewId() uint64 {
 	return atomic.AddUint64(&this.atomic_last_id, 1)
 }
 
-func (this *LRUCache) Prune() {
+func (this *implLRUCache) Prune() {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	num_shards := (1 << this.num_shard_bits)
@@ -143,7 +143,7 @@ func (this *LRUCache) Prune() {
 	}
 }
 
-func (this *LRUCache) TotalCharge() uint64 {
+func (this *implLRUCache) TotalCharge() uint64 {
 	var total uint64 = 0;
 	for s := 0; s < (1 << this.num_shard_bits); s++ {
 		total += this.shards[s].TotalCharge();
@@ -151,38 +151,49 @@ func (this *LRUCache) TotalCharge() uint64 {
 	return total;
 }
 
-func (this *LRUCache) shard(hash uint32) uint32 {
+func (this *implLRUCache) shard(hash uint32) uint32 {
 	if (this.num_shard_bits > 0) {
 		return hash >> (32 - this.num_shard_bits)
 	}
 	return 0
 }
 
-func (this *LRUCache) Insert(key []byte, entry interface{}, charge uint64, deleter DeleteCallback) {
+func (this *implLRUCache) Insert(key []byte, entry interface{}, charge uint64, deleter DeleteCallback) error {
 	realkey := keyAdaptNamespace(key, this.namespace)
 	hash := HashSlice(realkey);
-	this.shards[this.shard(hash)].Insert(realkey, hash, entry, charge, deleter);
+	return this.shards[this.shard(hash)].Insert(realkey, hash, entry, charge, deleter);
 }
 
-func (this *LRUCache) Lookup(key []byte) interface{} {
+func (this *implLRUCache) Reference(key []byte) (interface{}, bool) {
+	realkey := keyAdaptNamespace(key, this.namespace)
+	hash := HashSlice(realkey);
+	return this.shards[this.shard(hash)].Reference(realkey, hash);
+}
+func (this *implLRUCache) Release(key []byte) {
+	realkey := keyAdaptNamespace(key, this.namespace)
+	hash := HashSlice(realkey);
+	this.shards[this.shard(hash)].Release(realkey, hash);
+}
+
+func (this *implLRUCache) Lookup(key []byte) (interface{}, bool) {
 	realkey := keyAdaptNamespace(key, this.namespace)
 	hash := HashSlice(realkey);
 	return this.shards[this.shard(hash)].Lookup(realkey, hash);
 }
 
-func (this *LRUCache) Remove(key []byte) interface{} {
+func (this *implLRUCache) Remove(key []byte) (interface{}, bool) {
 	realkey := keyAdaptNamespace(key, this.namespace)
 	hash := HashSlice(realkey);
 	return this.shards[this.shard(hash)].Remove(realkey, hash);
 }
 
-func (this *LRUCache) Merge(key []byte, entry interface{}, charge uint64, merge_opt MergeOperator, charge_opt ChargeOperator) (interface{}) {
+func (this *implLRUCache) Merge(key []byte, entry interface{}, charge uint64, merge_opt MergeOperator, charge_opt ChargeOperator) (interface{}) {
 	realkey := keyAdaptNamespace(key, this.namespace)
 	hash := HashSlice(realkey);
 	return this.shards[this.shard(hash)].Merge(realkey, hash, entry, charge, merge_opt, charge_opt);
 }
 
-func (this *LRUCache) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
+func (this *implLRUCache) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	for _, shard := range this.shards {
@@ -190,7 +201,7 @@ func (this *LRUCache) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
 	}
 }
 
-func (this *LRUCache) SetCapacity(capacity uint64) {
+func (this *implLRUCache) SetCapacity(capacity uint64) {
 	this.mutex.Lock();
 	defer this.mutex.Unlock();
 	per_shard := getPerfShardCapacity(capacity, this.num_shard_bits)

@@ -65,14 +65,40 @@ func (this *LRUCacheShard) Insert(key []byte, hash uint32, entry interface{}, ch
 /**
 find key's lruhandle, return nil if not find;
 */
-func (this *LRUCacheShard) Lookup(key []byte, hash uint32) interface{} {
+func (this *LRUCacheShard) Lookup(key []byte, hash uint32) (interface{}, bool) {
 	this.mutex.Lock();
 	defer this.mutex.Unlock()
 	e := this.handle_lookup_update(key, hash);
 	if e != nil {
-		return e.entry
+		return e.entry, true
 	}
-	return nil;
+	return nil, false
+}
+
+func (this *LRUCacheShard) Remove(key []byte, hash uint32) (interface{}, bool) {
+	this.mutex.Lock();
+	defer this.mutex.Unlock();
+	return this.lru_remove(key, hash)
+}
+
+func (this *LRUCacheShard) Reference(key []byte, hash uint32) (interface{}, bool) {
+	this.mutex.Lock();
+	defer this.mutex.Unlock();
+	e := this.handle_lookup(key, hash)
+	if e != nil {
+		e.Reference()
+		return e, true
+	}
+	return nil, false
+}
+
+func (this *LRUCacheShard) Release(key []byte, hash uint32) {
+	this.mutex.Lock();
+	defer this.mutex.Unlock();
+	e := this.handle_lookup(key, hash)
+	if e != nil {
+		e.Release()
+	}
 }
 
 func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, charge uint64, merge MergeOperator, charge_opt ChargeOperator) (interface{}) {
@@ -95,12 +121,6 @@ func (this *LRUCacheShard) Merge(key []byte, hash uint32, entry interface{}, cha
 	}
 	this.insert(key, hash, new_value, new_charge, deleter)
 	return res
-}
-
-func (this *LRUCacheShard) Remove(key []byte, hash uint32) interface{} {
-	this.mutex.Lock();
-	defer this.mutex.Unlock();
-	return this.lru_remove(key, hash)
 }
 
 func (this *LRUCacheShard) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
@@ -145,7 +165,7 @@ func (this *LRUCacheShard) insert(key []byte, hash uint32, entry interface{}, ch
 
 	// if capacity == 0; will turn off caching
 	if this.capacity > 0 {
-		this.lru_insert(handle, charge)
+		err = this.lru_insert(handle, charge)
 	} else {
 		err = errors.New("cache is turn off")
 	}
@@ -177,39 +197,54 @@ func (this *LRUCacheShard) EvictLRU() {
 
 /*********** lru method *************/
 
-func (this *LRUCacheShard) lru_remove(key []byte, hash uint32) interface{} {
+func (this *LRUCacheShard) lru_remove(key []byte, hash uint32) (interface{}, bool) {
 	e := this.handle_lookup(key, hash);
 	if e != nil {
 		this.lru_remove_handle(e, true)
-		return e.entry
+		return e.entry, true
 	}
-	return nil
+	return nil, false
 }
 
 /**
 lru Remove; if table Insert return's handle, it's aready removed from table,
 so also_table is flase
 */
-func (this *LRUCacheShard) lru_remove_handle(e *LRUHandle, also_table bool) {
+func (this *LRUCacheShard) lru_remove_handle(e *LRUHandle, also_table bool) bool {
+
+	var remove_succ bool = false
 	if also_table {
-		this.table.Remove(e.key, e.hash)
+		// will remove fail if handle's ref > 1
+		remove_succ, _ = this.table.Remove(e.key, e.hash)
 	}
-	this.list_remove(e)
-	if (e.deleter != nil) {
-		e.deleter(e.key, e.entry)
+
+	if also_table && !remove_succ {
+		return false
+	} else {
+		this.list_remove(e)
+		if (e.deleter != nil) {
+			e.deleter(e.key, e.entry)
+		}
+		this.usage -= e.charge;
+		this.handlePool.Put(e)
+		return true
 	}
-	this.usage -= e.charge;
-	this.handlePool.Put(e)
 }
 
-func (this *LRUCacheShard) lru_insert(e *LRUHandle, charge uint64) {
+func (this *LRUCacheShard) lru_insert(e *LRUHandle, charge uint64) error {
 	this.list_append(e)
 	this.usage += charge
-	old := this.table.Insert(e)
+	old, err := this.table.Insert(e)
+	if err != nil {
+		return err
+	}
 	if old != nil {
 		//don't need table.Remove; it's aready removed
-		this.lru_remove_handle(old, false)
+		if !this.lru_remove_handle(old, false) {
+			panic("unarrive")
+		}
 	}
+	return nil
 }
 
 /*********** lru list method *************/

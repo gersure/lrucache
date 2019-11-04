@@ -168,12 +168,12 @@ func TestNewLRUCache(t *testing.T) {
 		for _, tcase := range case_cache {
 			lru.Insert(tcase.key, tcase.value, tcase.charge, tcase.deleter)
 
-			origin := lru.Lookup(tcase.key)
+			origin,_ := lru.Lookup(tcase.key)
 			origin, _ = origin.(string)
 			if (origin != tcase.value) {
 				t.Errorf("insert key: %s ,value : %s, got value : %s", (tcase.key), (tcase.value), (origin))
 			}
-			if lru_nil.Lookup(tcase.key) != nil {
+			if v, _ := lru_nil.Lookup(tcase.key); v != nil {
 				t.Errorf("insert key in namesapce [%s], got in [namesapce_nil]", namespace)
 			}
 		}
@@ -189,7 +189,7 @@ func TestLRUCache_InsertLookupRemove(t *testing.T) {
 			lru.Insert(test_bar.key, test_bar.value, test_bar.charge, test_bar.deleter)
 			total_charge += (test_bar.charge)
 
-			origin := lru.Lookup(test_bar.key)
+			origin, _ := lru.Lookup(test_bar.key)
 			origin, _ = origin.(string)
 			if (origin != test_bar.value) {
 				t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
@@ -206,7 +206,7 @@ func TestLRUCache_InsertLookupRemove(t *testing.T) {
 	for _, test_bar := range case_cache {
 		lru.Insert(test_bar.key, test_bar.value, test_bar.charge, test_bar.deleter)
 		total_charge += (test_bar.charge)
-		origin := lru.Lookup(test_bar.key)
+		origin, _ := lru.Lookup(test_bar.key)
 		origin, _ = origin.(string)
 		if origin != test_bar.value {
 			t.Errorf("put key: %s ,value : %s, got value : %s", (test_bar.key), (test_bar.value), (origin))
@@ -215,7 +215,7 @@ func TestLRUCache_InsertLookupRemove(t *testing.T) {
 			t.Errorf("total charge expected: %v, got: %v", total_charge, lru.TotalCharge())
 		}
 
-		origin = lru.Remove(test_bar.key)
+		origin, _ = lru.Remove(test_bar.key)
 		origin, _ = origin.(string)
 		total_charge -= (test_bar.charge)
 		if (origin != test_bar.value) {
@@ -303,7 +303,7 @@ func TestLRUCache_MergeAddInt(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, IntMergeOperator, IntChargeOperator)
 		res_total += merge_value
-		res := lru.Lookup(key)
+		res, _ := lru.Lookup(key)
 		add_res, _ := res.(int)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
@@ -314,7 +314,7 @@ func TestLRUCache_MergeAddInt(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, IntMergeOperator, IntChargeOperator)
 		res_total += merge_value
-		res := lru.Lookup(key)
+		res, _ := lru.Lookup(key)
 		add_res, _ := res.(int)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
@@ -325,7 +325,7 @@ func TestLRUCache_MergeAddInt(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, IntMergeOperator, IntChargeOperator)
 		res_total += merge_value
-		res := lru.Lookup(key)
+		res, _ := lru.Lookup(key)
 		add_res, _ := res.(int)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
@@ -348,7 +348,7 @@ func TestLRUCache_MergeAddInt64(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
 		res_total += merge_value
-		res := lru.Lookup(key)
+		res, _ := lru.Lookup(key)
 		add_res, _ := res.(int64)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
@@ -359,7 +359,7 @@ func TestLRUCache_MergeAddInt64(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
 		res_total += merge_value
-		res := lru.Lookup(key)
+		res, _ := lru.Lookup(key)
 		add_res, _ := res.(int64)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
@@ -370,7 +370,7 @@ func TestLRUCache_MergeAddInt64(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		lru.Merge(key, merge_value, 4, Int64MergeOperator, Int64ChargeOperator)
 		res_total += merge_value
-		res := lru.Lookup(key)
+		res, _ := lru.Lookup(key)
 		add_res, _ := res.(int64)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%d, got:%d", res_total, add_res)
@@ -405,7 +405,7 @@ func TestLRUCache_MergeAppend(t *testing.T) {
 		res_string += merge_value
 		capacity_totoal += uint64(len(merge_value))
 		res_total += merge_value
-		res := lru.Lookup(key)
+		res, _ := lru.Lookup(key)
 		add_res, _ := res.(string)
 		if add_res != res_total {
 			t.Errorf("merge operator error expected:%s, got:%s", res_total, add_res)

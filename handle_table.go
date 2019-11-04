@@ -18,21 +18,21 @@
 package lrucache
 
 import (
-"bytes"
+	"bytes"
+	"errors"
 )
 
-
 type LRUHandle struct {
+	key       []byte; // Beginning of key
 	entry     interface{}
 	deleter   DeleteCallback
 	next_hash *LRUHandle
 	next      *LRUHandle;
 	prev      *LRUHandle;
-	charge    uint64; // TODO(opt): Only allow uint32_t?
+	charge    uint64;
+	ref       uint32;
 	hash      uint32; // Hash of key(); used for fast sharding and comparisons
-	key  []byte; // Beginning of key
 }
-
 
 type HandleTable struct {
 	list   []*LRUHandle
@@ -55,15 +55,18 @@ func (this *HandleTable) Lookup(key []byte, hash uint32) *LRUHandle {
 }
 
 /**
-	when not find return nil;
-	else replace handl and return old handle
- */
-func (this *HandleTable) Insert(e *LRUHandle) *LRUHandle {
+when not find return nil;
+else replace handl and return old handle
+*/
+func (this *HandleTable) Insert(e *LRUHandle) (*LRUHandle, error) {
 	pptr := this.findPointer(e.key, e.hash)
 	old := *pptr
 	if (old == nil) {
 		e.next_hash = nil
 	} else {
+		if old.ref >= 1 {
+			return e, errors.New("Old values still have references")
+		}
 		e.next_hash = old.next_hash
 	}
 
@@ -76,21 +79,30 @@ func (this *HandleTable) Insert(e *LRUHandle) *LRUHandle {
 		}
 	}
 
-	return old
+	return old, nil
 }
 
-
-func (this *HandleTable) Remove(key []byte, hash uint32) *LRUHandle {
+/**
+	return value:
+    if delete handle or not
+    now handle's reference
+ */
+func (this *HandleTable) Remove(key []byte, hash uint32) (bool, uint32) {
 	pptr := this.findPointer(key, hash)
 	result := *pptr;
-	if (result != nil) {
-		*pptr = result.next_hash
-		this.elems--
+	if (result != nil ) {
+		(*pptr).Release()
+
+		if (*pptr).ref <= 1 {
+			*pptr = result.next_hash
+			this.elems--
+			return true, (*pptr).ref
+		} else {
+			return false, (*pptr).ref
+		}
 	}
-	return result
+	return false, -1
 }
-
-
 
 func (this *HandleTable) Resize() {
 
@@ -119,7 +131,6 @@ func (this *HandleTable) Resize() {
 
 	this.list = new_list[:]
 	this.lenght = uint32(new_length)
-
 }
 
 func (this *HandleTable) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) {
@@ -133,8 +144,6 @@ func (this *HandleTable) ApplyToAllCacheEntries(travel_fun TravelEntryOperator) 
 	}
 }
 
-
-
 func (this *HandleTable) findPointer(key []byte, hash uint32) **LRUHandle {
 	ptr := &this.list[hash&(this.lenght-1)]
 	for ; *ptr != nil &&
@@ -142,4 +151,14 @@ func (this *HandleTable) findPointer(key []byte, hash uint32) **LRUHandle {
 		ptr = &(*ptr).next_hash
 	}
 	return ptr
+}
+
+func (h *LRUHandle) Reference() {
+	h.ref++
+}
+
+func (h *LRUHandle) Release() {
+	if h.ref > 0 {
+		h.ref--
+	}
 }

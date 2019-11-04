@@ -27,22 +27,30 @@ type MergeOperator func(old_entry, new_entry interface{}) interface{}
 type ChargeOperator func(entry interface{}, old_charge, new_charge uint64) uint64
 type TravelEntryOperator func(key []byte, entry interface{})
 
-type Cache interface {
+type LRUCache interface {
 	Put(key string, value string)
 	Get(key string) (string, bool)
 	Delete(key string)
-	NewId() uint64
 	Prune()
 	TotalCharge() uint64
 
-	Insert(key[]byte, entry interface{}, charge uint64, deleter DeleteCallback)
-	Lookup(key []byte) interface{}
-	Remove(key []byte) interface{}
+	Insert(key[]byte, entry interface{}, charge uint64, deleter DeleteCallback) error
+	Lookup(key []byte) (interface{}, bool)
+	Remove(key []byte) (interface{}, bool)
 	Merge(key []byte, entry interface{}, charge uint64,  merge_opt MergeOperator, charge_opt ChargeOperator) (old_entry interface{})
 	ApplyToAllCacheEntries(TravelEntryOperator)
 }
 
+type RefCache interface {
+	Insert(key[]byte, entry interface{}, charge uint64, deleter DeleteCallback) error
+	Lookup(key []byte) (interface{}, bool)
+	Reference(key []byte) (interface{}, bool)
+	Release(key []byte)
 
+	NewId() uint64
+	TotalCharge() uint64
+	ApplyToAllCacheEntries(TravelEntryOperator)
+}
 
 var IntMergeOperator MergeOperator = func(old_entry, new_entry interface{}) interface{} {
 	if old_entry == nil {
@@ -63,8 +71,6 @@ var IntChargeOperator ChargeOperator = func(entry interface{}, old_charge, new_c
 	var a int
 	return uint64(unsafe.Sizeof(a))
 }
-
-
 
 var Int64MergeOperator MergeOperator = func(old_entry, new_entry interface{}) interface{} {
 	if old_entry == nil {
