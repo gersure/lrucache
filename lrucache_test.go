@@ -401,7 +401,7 @@ func TestLRUCache_MergeAppend(t *testing.T) {
 	InitLRUCache(capacity, 1)
 	lru := DefaultLRUCache()
 	for i := 0; i < 100; i++ {
-		old_origin := lru.Merge(key, merge_value, uint64(len(merge_value)), merge_opt, charge_opt)
+		old_origin,_ := lru.Merge(key, merge_value, uint64(len(merge_value)), merge_opt, charge_opt)
 		res_string += merge_value
 		capacity_totoal += uint64(len(merge_value))
 		res_total += merge_value
